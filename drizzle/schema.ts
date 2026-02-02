@@ -8,6 +8,7 @@ import {
   boolean,
   datetime,
   index,
+  uniqueIndex,
 } from "drizzle-orm/mysql-core";
 
 /**
@@ -70,6 +71,8 @@ export const appointments = mysqlTable(
     userIdIdx: index("userId_idx").on(table.userId),
     appointmentDateIdx: index("appointmentDate_idx").on(table.appointmentDate),
     statusIdx: index("status_idx").on(table.status),
+    // Garante que não existam dois agendamentos confirmados/pendentes no mesmo horário
+    uniqueAppointmentIdx: uniqueIndex("unique_appointment_idx").on(table.appointmentDate, table.startTime),
   })
 );
 
