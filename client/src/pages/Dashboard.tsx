@@ -41,18 +41,20 @@ export default function Dashboard() {
     { enabled: !!selectedSlot?.date }
   );
 
-  const createAppointmentMutation = trpc.appointments.create.useMutation({
-    onSuccess: () => {
+  const createAppointmentMutation = trpc.appointments.create.useMutation();
+
+  useEffect(() => {
+    if (createAppointmentMutation.isSuccess) {
       setSelectedSlot(null);
       setReason("");
       setNotes("");
       upcomingQuery.refetch();
       toast.success("Agendamento realizado com sucesso!");
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao realizar agendamento");
     }
-  });
+    if (createAppointmentMutation.isError) {
+      toast.error(createAppointmentMutation.error.message || "Erro ao realizar agendamento");
+    }
+  }, [createAppointmentMutation.isSuccess, createAppointmentMutation.isError]);
 
   const generateDocumentMutation = trpc.documents.generateMyDocument.useMutation({
     onSuccess: (data) => {

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { Calendar, Clock, Loader2, User, FileText, CheckCircle, XCircle, Clock4, UserMinus, Info, Mail, Phone, MapPin, AlertTriangle, RefreshCw, Send } from "lucide-react";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,40 +23,45 @@ export default function DailyAppointments() {
   const [cancelReason, setCancelReason] = useState("");
   
   const dailyQuery = trpc.admin.getDailyAppointments.useQuery({ date: selectedDate });
-  const sendNotificationMutation = trpc.admin.sendCustomNotification.useMutation({
-    onSuccess: () => {
+  const sendNotificationMutation = trpc.admin.sendCustomNotification.useMutation();
+  const updateStatusMutation = trpc.admin.updateStatus.useMutation();
+  const cancelMutation = trpc.appointments.cancel.useMutation();
+
+  useEffect(() => {
+    if (sendNotificationMutation.isSuccess) {
       toast.success("Notificação enviada com sucesso!");
       setNotificationModalOpen(false);
       setNotificationMessage("");
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao enviar notificação");
-    },
-    onSettled: () => {
+    }
+    if (sendNotificationMutation.isError) {
+      toast.error(sendNotificationMutation.error.message || "Erro ao enviar notificação");
+    }
+    if (sendNotificationMutation.isSuccess || sendNotificationMutation.isError) {
       setIsSendingNotification(false);
     }
-  });
-  const updateStatusMutation = trpc.admin.updateStatus.useMutation({
-    onSuccess: () => {
+  }, [sendNotificationMutation.isSuccess, sendNotificationMutation.isError]);
+
+  useEffect(() => {
+    if (updateStatusMutation.isSuccess) {
       toast.success("Status atualizado");
       dailyQuery.refetch();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao atualizar status");
     }
-  });
+    if (updateStatusMutation.isError) {
+      toast.error(updateStatusMutation.error.message || "Erro ao atualizar status");
+    }
+  }, [updateStatusMutation.isSuccess, updateStatusMutation.isError]);
 
-  const cancelMutation = trpc.appointments.cancel.useMutation({
-    onSuccess: () => {
+  useEffect(() => {
+    if (cancelMutation.isSuccess) {
       toast.success("Agendamento cancelado com sucesso");
       setCancelModalOpen(false);
       setCancelReason("");
       dailyQuery.refetch();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao cancelar agendamento");
     }
-  });
+    if (cancelMutation.isError) {
+      toast.error(cancelMutation.error.message || "Erro ao cancelar agendamento");
+    }
+  }, [cancelMutation.isSuccess, cancelMutation.isError]);
 
   if (loading) return null;
   if (!user || user.role !== 'admin') {

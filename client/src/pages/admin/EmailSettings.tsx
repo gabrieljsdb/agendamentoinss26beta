@@ -19,15 +19,17 @@ export default function EmailSettings() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [currentTemplate, setCurrentTemplate] = useState<any>(null);
 
-  const templatesQuery = trpc.admin.getEmailTemplates.useQuery(undefined, {
-    onSuccess: (data) => {
-      setTemplates(data);
-      if (data.length > 0 && !activeTab) {
-        setActiveTab(data[0].slug);
-        setCurrentTemplate(data[0]);
+  const templatesQuery = trpc.admin.getEmailTemplates.useQuery();
+
+  useEffect(() => {
+    if (templatesQuery.data) {
+      setTemplates(templatesQuery.data);
+      if (templatesQuery.data.length > 0 && !activeTab) {
+        setActiveTab(templatesQuery.data[0].slug);
+        setCurrentTemplate(templatesQuery.data[0]);
       }
     }
-  });
+  }, [templatesQuery.data]);
 
   const saveMutation = trpc.admin.saveEmailTemplate.useMutation({
     onSuccess: () => {

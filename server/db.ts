@@ -9,6 +9,7 @@ import {
   auditLogs,
   emailQueue,
   systemSettings,
+  emailTemplates,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 

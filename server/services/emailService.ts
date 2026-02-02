@@ -307,6 +307,108 @@ export class EmailService {
       userId: data.userId,
     });
   }
+
+  /**
+   * Envia relatório diário de agendamentos para administradores
+   */
+  async sendDailyReport(data: {
+    reportDate: string;
+    appointments: Array<{
+      userName: string;
+      userEmail: string;
+      appointmentDate: string;
+      startTime: string;
+      endTime: string;
+      reason: string;
+      phone?: string;
+    }>;
+  }): Promise<void> {
+    try {
+      const settings = await getSystemSettings();
+      if (!settings) {
+        console.error("[EmailService] Configurações do sistema não encontradas");
+        return;
+      }
+
+      const adminEmails = settings.adminEmails.split(",").map(email => email.trim());
+      
+      const appointmentsList = data.appointments
+        .map(
+          (apt) =>
+            `<tr>
+              <td style="padding: 8px; border: 1px solid #ddd;">${apt.userName}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${apt.userEmail}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${apt.phone || "N/A"}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${apt.startTime} - ${apt.endTime}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${apt.reason}</td>
+            </tr>`
+        )
+        .join("");
+
+      const body = `
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório Diário de Agendamentos</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header { background: #667eea; color: white; padding: 20px; border-radius: 5px 5px 0 0; text-align: center; }
+        .content { background: #f9f9f9; padding: 20px; border: 1px solid #ddd; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; background: white; }
+        th { background: #667eea; color: white; padding: 10px; text-align: left; }
+        td { padding: 8px; border: 1px solid #ddd; }
+        .footer { background: #f0f0f0; padding: 15px; text-align: center; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>📊 Relatório Diário de Agendamentos</h2>
+        </div>
+        <div class="content">
+            <p><strong>Data do Relatório:</strong> ${data.reportDate}</p>
+            <p><strong>Total de Agendamentos:</strong> ${data.appointments.length}</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Email</th>
+                        <th>Telefone</th>
+                        <th>Horário</th>
+                        <th>Motivo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${appointmentsList}
+                </tbody>
+            </table>
+        </div>
+        <div class="footer">
+            <p>Este é um email automático gerado pelo Sistema de Agendamento INSS.</p>
+        </div>
+    </div>
+</body>
+</html>`;
+
+      for (const adminEmail of adminEmails) {
+        await this.queueEmail({
+          toEmail: adminEmail,
+          subject: `Relatório Diário de Agendamentos - ${data.reportDate}`,
+          body,
+          emailType: "daily_report",
+        });
+      }
+
+      console.log(`[EmailService] Relatório diário enviado para ${adminEmails.length} administrador(es)`);
+    } catch (error) {
+      console.error("[EmailService] Erro ao enviar relatório diário:", error);
+      throw error;
+    }
+  }
 }
 
 // Exporta instância singleton

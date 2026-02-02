@@ -456,6 +456,79 @@ export const appRouter = router({
   }),
 
   appointments: router({
+    create: protectedProcedure
+      .input(z.object({
+        appointmentDate: z.date(),
+        startTime: z.string(),
+        endTime: z.string(),
+        reason: z.string().min(1, "Motivo é obrigatório"),
+        phone: z.string().min(1, "Telefone é obrigatório"),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        try {
+          // Validações
+          const validationResult = await appointmentValidationService.validateAppointment(
+            input.appointmentDate,
+            input.startTime,
+            ctx.user.id
+          );
+
+          if (!validationResult.valid) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: validationResult.message,
+            });
+          }
+
+          // Cria o agendamento
+          const appointmentId = await createAppointment({
+            userId: ctx.user.id,
+            appointmentDate: input.appointmentDate,
+            startTime: input.startTime,
+            endTime: input.endTime,
+            reason: input.reason,
+            notes: input.notes,
+          });
+
+          // Atualiza o telefone do usuário se fornecido
+          if (input.phone) {
+            await updateUserPhone(ctx.user.id, input.phone);
+          }
+
+          // Incrementa contador de agendamentos
+          await incrementAppointmentCount(ctx.user.id);
+
+          // Envia email de confirmação
+          await emailService.sendAppointmentConfirmation({
+            toEmail: ctx.user.email,
+            userName: ctx.user.name,
+            appointmentDate: input.appointmentDate.toLocaleDateString("pt-BR"),
+            startTime: input.startTime.substring(0, 5),
+            endTime: input.endTime.substring(0, 5),
+            reason: input.reason,
+            appointmentId,
+            userId: ctx.user.id,
+          });
+
+          // Log de auditoria
+          await logAuditAction({
+            userId: ctx.user.id,
+            action: "CREATE_APPOINTMENT",
+            entityType: "appointment",
+            entityId: appointmentId,
+            details: `Agendamento criado para ${input.appointmentDate.toLocaleDateString("pt-BR")} às ${input.startTime}`,
+            ipAddress: ctx.req.ip,
+          });
+
+          return { success: true, appointmentId };
+        } catch (error) {
+          console.error("[Appointments] Erro ao criar agendamento:", error);
+          if (error instanceof TRPCError) throw error;
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Erro ao criar agendamento" });
+        }
+      }),
+
     getAvailableSlots: protectedProcedure
       .input(z.object({ date: z.date() }))
       .query(async ({ input }) => {
