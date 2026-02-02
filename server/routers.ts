@@ -18,7 +18,7 @@ import {
   getAppointmentsByDate,
 } from "./db";
 import { eq, and, gte, lte, asc, desc } from "drizzle-orm";
-import { users, appointments, blockedSlots } from "../drizzle/schema";
+import { users, appointments, blockedSlots, appointmentMessages } from "../drizzle/schema";
 import { soapAuthService } from "./services/soapAuthService";
 import { appointmentValidationService } from "./services/appointmentValidationService";
 import { emailService } from "./services/emailService";
@@ -449,6 +449,66 @@ export const appRouter = router({
           entityType: "blocked_slot",
           entityId: input.blockId,
           ipAddress: ctx.req.ip,
+        });
+
+        return { success: true };
+      }),
+  }),
+
+  messages: router({
+    getMessages: protectedProcedure
+      .input(z.object({ appointmentId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
+
+        // Se não for admin, verifica se o agendamento pertence ao usuário
+        if (ctx.user.role !== "admin") {
+          const appointment = await db.select().from(appointments).where(eq(appointments.id, input.appointmentId)).limit(1);
+          if (appointment.length === 0 || appointment[0].userId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Você não tem permissão para ver estas mensagens" });
+          }
+        }
+
+        // Marca mensagens como lidas
+        await db.update(appointmentMessages)
+          .set({ isRead: true })
+          .where(
+            and(
+              eq(appointmentMessages.appointmentId, input.appointmentId),
+              eq(appointmentMessages.isAdmin, ctx.user.role === "admin" ? false : true)
+            )
+          );
+
+        return await db.select()
+          .from(appointmentMessages)
+          .where(eq(appointmentMessages.appointmentId, input.appointmentId))
+          .orderBy(asc(appointmentMessages.createdAt));
+      }),
+
+    sendMessage: protectedProcedure
+      .input(z.object({
+        appointmentId: z.number(),
+        message: z.string().min(1, "Mensagem não pode ser vazia"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
+
+        // Se não for admin, verifica se o agendamento pertence ao usuário
+        if (ctx.user.role !== "admin") {
+          const appointment = await db.select().from(appointments).where(eq(appointments.id, input.appointmentId)).limit(1);
+          if (appointment.length === 0 || appointment[0].userId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Você não tem permissão para enviar mensagens para este agendamento" });
+          }
+        }
+
+        await db.insert(appointmentMessages).values({
+          appointmentId: input.appointmentId,
+          senderId: ctx.user.id,
+          message: input.message,
+          isAdmin: ctx.user.role === "admin",
+          isRead: false,
         });
 
         return { success: true };

@@ -194,5 +194,20 @@ export const emailTemplates = mysqlTable("email_templates", {
   updatedAt: timestamp("UPDATEDAT").defaultNow().onUpdateNow().notNull(),
 });
 
+/**
+ * APPOINTMENT_MESSAGES TABLE - Chat entre usuário e administrador
+ */
+export const appointmentMessages = mysqlTable("appointment_messages", {
+  id: int("ID").autoincrement().primaryKey(),
+  appointmentId: int("APPOINTMENTID").notNull(),
+  senderId: int("SENDERID").notNull(),
+  message: text("MESSAGE").notNull(),
+  isAdmin: boolean("ISADMIN").default(false).notNull(),
+  isRead: boolean("ISREAD").default(false).notNull(),
+  createdAt: timestamp("CREATEDAT").defaultNow().notNull(),
+}, (table) => ({
+  appointmentIdx: index("appointment_idx").on(table.appointmentId),
+}));
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;

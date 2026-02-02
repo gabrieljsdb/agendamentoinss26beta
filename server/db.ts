@@ -10,6 +10,7 @@ import {
   emailQueue,
   systemSettings,
   emailTemplates,
+  appointmentMessages,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
